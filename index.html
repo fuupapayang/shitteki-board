@@ -108,6 +108,11 @@ textarea{min-height:96px;resize:vertical}
       <label>お名前（一覧に表示されます）
         <input id="author" type="text" maxlength="30" placeholder="例：山田">
       </label>
+      <div id="shotbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button id="shot" class="primary" type="button">チャットボット画面を撮影</button>
+        <button id="stopshot" type="button" hidden>画面共有を止める</button>
+        <span class="hint" id="shothint">初回だけ、ブラウザの確認が出ます。</span>
+      </div>
       <div id="drop" class="drop" tabindex="0" role="button" aria-label="スクリーンショットを追加">
         <strong>スクリーンショットを貼り付け</strong>（Ctrl/⌘ + V）<br>
         またはここにドロップ、クリックしてファイルを選択
@@ -250,6 +255,46 @@ textarea{min-height:96px;resize:vertical}
       if(its[i].type.indexOf("image/")===0){var f=its[i].getAsFile();if(f){e.preventDefault();setDraftImage(f);return}}
     }
   });
+
+  /* ---------- ワンクリック撮影(画面共有を使う) ---------- */
+  var cap={stream:null,video:null};
+  function stopCapture(){
+    if(cap.stream)cap.stream.getTracks().forEach(function(t){t.stop()});
+    cap={stream:null,video:null};$("stopshot").hidden=true;
+    $("shothint").textContent="初回だけ、ブラウザの確認が出ます。";
+  }
+  async function startCapture(){
+    var stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false,preferCurrentTab:true,selfBrowserSurface:"include"});
+    var track=stream.getVideoTracks()[0],cropped=false;
+    try{
+      if(window.CropTarget&&CropTarget.fromElement&&track.cropTo){
+        await track.cropTo(await CropTarget.fromElement($("bot")));cropped=true;
+      }
+    }catch(e){}
+    var v=document.createElement("video");v.muted=true;v.playsInline=true;v.srcObject=stream;await v.play();
+    track.addEventListener("ended",stopCapture);
+    cap={stream:stream,video:v};
+    $("stopshot").hidden=false;
+    $("shothint").textContent=cropped?"共有中：次からは1クリックで撮影できます。":"共有中：チャットボットが映っている画面を選んでいる場合は、次から1クリックで撮影できます。";
+  }
+  $("shot").addEventListener("click",async function(){
+    var b=$("shot");b.disabled=true;
+    try{
+      if(!cap.stream||!cap.stream.active)await startCapture();
+      await new Promise(function(r){setTimeout(r,350)});
+      var v=cap.video,w=v.videoWidth,h=v.videoHeight;
+      if(!w||!h)throw new Error("noframe");
+      var cv=document.createElement("canvas");cv.width=w;cv.height=h;cv.getContext("2d").drawImage(v,0,0,w,h);
+      var blob=await new Promise(function(r){cv.toBlob(r,"image/png")});
+      setDraftImage(blob);toast("撮影しました。画像をクリックしてピンを置けます");
+    }catch(e){
+      if(e&&e.name==="NotAllowedError")toast("画面共有が許可されませんでした");
+      else toast("撮影できませんでした。貼り付けでも追加できます");
+      stopCapture();
+    }finally{b.disabled=false}
+  });
+  $("stopshot").addEventListener("click",stopCapture);
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia)$("shotbar").hidden=true;
 
   /* ---------- 投稿 ---------- */
   $("post").addEventListener("click",async function(){
