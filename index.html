@@ -137,8 +137,14 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
         <p class="hint" id="pinhint">画像をクリックすると、気になる位置にピンを置けます。</p>
         <button id="clear" type="button" style="margin-top:8px">画像を外す</button>
       </div>
-      <label>場所（画面・質問番号など）
-        <input id="place" type="text" maxlength="120" placeholder="例：アンケート 3問目 / チャット画面の最初の返答">
+      <label>指摘箇所
+        <select id="place">
+          <option value="">選択してください</option>
+          <option>アンケート</option>
+          <option>回答（建物）</option>
+          <option>回答（建物以外）</option>
+          <option>その他</option>
+        </select>
       </label>
       <div class="row2">
         <label>種類
@@ -308,6 +314,7 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
   $("post").addEventListener("click",async function(){
     var text=$("text").value.trim(),author=$("author").value.trim();
     if(!author){toast("お名前を入力してください");$("author").focus();return}
+    if(!$("place").value){toast("「指摘箇所」を選んでください");$("place").focus();return}
     if(!text){toast("「気になる点」を入力してください");$("text").focus();return}
     var btn=$("post");btn.disabled=true;btn.textContent="投稿中…";
     try{
