@@ -107,7 +107,7 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
     </div>
     <div class="hd-actions">
       <a class="btn" id="open-bot" href="#" target="_blank" rel="noopener">チャットボットを開く ↗</a>
-      <button id="export" type="button">CSVで書き出す</button>
+      <a class="btn primary" id="to-list" href="list.html">指摘内容を一覧で見る</a>
     </div>
   </header>
 
@@ -154,21 +154,14 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
       <button id="post" class="primary" type="button" disabled>指摘を投稿</button>
     </section>
 
-    <section aria-labelledby="list-h" style="display:grid;gap:12px;min-width:0">
-      <h2 id="list-h" style="font:700 16px var(--f-display);margin:0">共有された指摘</h2>
-      <div class="filters">
-        <select id="f-status" aria-label="状況で絞り込み"><option value="">すべての状況</option><option>未対応</option><option>対応中</option><option>完了</option></select>
-        <select id="f-cat" aria-label="種類で絞り込み"><option value="">すべての種類</option><option>文言</option><option>デザイン</option><option>挙動</option><option>回答内容</option><option>その他</option></select>
-        <select id="f-sev" aria-label="重要度で絞り込み"><option value="">すべての重要度</option><option>高</option><option>中</option><option>低</option></select>
-        <span class="seg" role="group" aria-label="表示の切り替え"><button id="v-card" type="button">カード</button><button id="v-table" type="button">一覧表</button></span>
-        <span class="count" id="count"></span>
-      </div>
-      <div class="list" id="list"><div class="empty">読み込み中…</div></div>
+    <section class="panel" aria-labelledby="list-h">
+      <h2 id="list-h">共有された指摘</h2>
+      <p class="hint" id="count-line">読み込み中…</p>
+      <a class="btn" href="list.html">指摘内容を一覧で見る →</a>
     </section>
   </div>
   </div>
 </div>
-<div class="lb" id="lb" hidden><div class="shot" id="lbshot"><img id="lbimg" alt="指摘のスクリーンショット"></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -184,7 +177,7 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
   function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
   function toast(msg){var t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
   function fmt(ts){if(!ts)return"";var d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
-  function msg(html){$("list").innerHTML='<div class="empty">'+html+'</div>'}
+  function msg(t){$("count-line").textContent=t}
 
   $("open-bot").href=window.CHATBOT_URL||"#";
   if(window.CHATBOT_URL)$("bot").src=window.CHATBOT_URL;
@@ -332,104 +325,6 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
     }finally{btn.disabled=false;btn.textContent="指摘を投稿"}
   });
 
-  /* ---------- 一覧 ---------- */
-  var view=lsGet("shitteki-view")==="table"?"table":"card";
-  function syncSeg(){$("v-card").setAttribute("aria-pressed",view==="card");$("v-table").setAttribute("aria-pressed",view==="table")}
-  $("v-card").addEventListener("click",function(){view="card";lsSet("shitteki-view",view);syncSeg();render()});
-  $("v-table").addEventListener("click",function(){view="table";lsSet("shitteki-view",view);syncSeg();render()});
-  syncSeg();
-  function renderTable(shown){
-    var rows=shown.slice().reverse();
-    var wrap=document.createElement("div");wrap.className="tbl-wrap";
-    var t=document.createElement("table");t.className="tbl";
-    var th=document.createElement("thead"),hr=document.createElement("tr");
-    ["No","指摘箇所","指摘内容","種類","重要度","状況","投稿者"].forEach(function(h){var c=document.createElement("th");c.textContent=h;hr.appendChild(c)});
-    th.appendChild(hr);t.appendChild(th);
-    var tb=document.createElement("tbody");
-    rows.forEach(function(it){
-      var tr=document.createElement("tr");if(it.status==="完了")tr.className="done";
-      function td(cls,txt){var c=document.createElement("td");if(cls)c.className=cls;c.textContent=txt;tr.appendChild(c);return c}
-      var n=td("nw","#"+it._no);
-      if(it.img){var b=document.createElement("button");b.type="button";b.className="imgbtn";b.textContent="画像";b.addEventListener("click",function(){openLb(it)});n.appendChild(document.createElement("br"));n.appendChild(b)}
-      td("t-place",it.place||"（未入力）");
-      td("t-text",it.text);
-      td("nw",it.category||"");
-      var sv=td("nw sev-"+it.severity,it.severity);
-      var st=document.createElement("td");st.className="nw";
-      var sel=document.createElement("select");sel.className="status";sel.setAttribute("data-s",it.status);sel.setAttribute("aria-label","状況");
-      STATUSES.forEach(function(s){var o=document.createElement("option");o.textContent=s;if(s===it.status)o.selected=true;sel.appendChild(o)});
-      sel.addEventListener("change",function(){db.collection("issues").doc(it.id).update({status:sel.value}).catch(function(){toast("状況を変更できませんでした")})});
-      st.appendChild(sel);tr.appendChild(st);
-      td("nw",it.author||"匿名");
-      tb.appendChild(tr);
-    });
-    t.appendChild(tb);wrap.appendChild(t);$("list").appendChild(wrap);
-  }
-  function pinFor(it){return it.x==null?"":'<span class="pin" style="left:'+(it.x*100)+'%;top:'+(it.y*100)+'%">'+it._no+'</span>'}
-  function render(){
-    var fs=$("f-status").value,fc=$("f-cat").value,fv=$("f-sev").value;
-    var all=items.slice().sort(function(a,b){return a.createdAt-b.createdAt});
-    all.forEach(function(it,i){it._no=i+1});
-    var shown=all.filter(function(it){return(!fs||it.status===fs)&&(!fc||it.category===fc)&&(!fv||it.severity===fv)}).reverse();
-    $("count").textContent=shown.length+" / "+all.length+" 件";
-    var list=$("list");list.textContent="";
-    if(!all.length){msg("まだ指摘はありません。左のフォームから最初の1件を追加してください。");return}
-    if(!shown.length){msg("条件に合う指摘はありません。");return}
-    if(view==="table"){renderTable(shown);return}
-    shown.forEach(function(it){
-      var c=document.createElement("article");c.className="card"+(it.status==="完了"?" done":"");
-      var top=document.createElement("div");top.className="card-top";
-      var no=document.createElement("span");no.className="no";no.textContent="#"+it._no;top.appendChild(no);
-      var ch=document.createElement("span");ch.className="chip";ch.textContent=it.category||"";top.appendChild(ch);
-      var sv=document.createElement("span");sv.className="sev-"+it.severity;sv.textContent="重要度 "+it.severity;top.appendChild(sv);
-      c.appendChild(top);
-      if(it.place){var pl=document.createElement("div");pl.className="place";pl.textContent=it.place;c.appendChild(pl)}
-      if(it.img){
-        var sh=document.createElement("div");sh.className="shot";sh.style.cursor="zoom-in";
-        var im=document.createElement("img");im.alt="指摘 #"+it._no+" のスクリーンショット";im.src=it.img;
-        sh.appendChild(im);sh.insertAdjacentHTML("beforeend",pinFor(it));
-        sh.addEventListener("click",function(){openLb(it)});c.appendChild(sh);
-      }
-      var tx=document.createElement("p");tx.className="text";tx.textContent=it.text;c.appendChild(tx);
-      var meta=document.createElement("div");meta.className="meta";
-      var who=document.createElement("span");who.textContent=(it.author||"匿名")+"・"+fmt(it.createdAt);meta.appendChild(who);
-      var sp=document.createElement("span");sp.className="sp";
-      var sel=document.createElement("select");sel.className="status";sel.setAttribute("data-s",it.status);sel.setAttribute("aria-label","状況");
-      STATUSES.forEach(function(s){var o=document.createElement("option");o.textContent=s;if(s===it.status)o.selected=true;sel.appendChild(o)});
-      sel.addEventListener("change",function(){db.collection("issues").doc(it.id).update({status:sel.value}).catch(function(){toast("状況を変更できませんでした")})});
-      sp.appendChild(sel);
-      if(it.uid&&it.uid===uid){
-        var del=document.createElement("button");del.type="button";del.textContent="削除";del.className="status";
-        del.addEventListener("click",function(){
-          if(del.dataset.armed!=="1"){del.dataset.armed="1";del.textContent="もう一度押すと削除";setTimeout(function(){del.dataset.armed="";del.textContent="削除"},3000);return}
-          db.collection("issues").doc(it.id).delete().catch(function(){toast("削除できませんでした")});
-        });
-        sp.appendChild(del);
-      }
-      meta.appendChild(sp);c.appendChild(meta);list.appendChild(c);
-    });
-  }
-  ["f-status","f-cat","f-sev"].forEach(function(id){$(id).addEventListener("change",render)});
-  function openLb(it){
-    var s=$("lbshot");var old=s.querySelector(".pin");if(old)old.remove();
-    $("lbimg").src=it.img;s.insertAdjacentHTML("beforeend",pinFor(it));$("lb").hidden=false;
-  }
-  $("lb").addEventListener("click",function(){$("lb").hidden=true});
-  document.addEventListener("keydown",function(e){if(e.key==="Escape")$("lb").hidden=true});
-
-  /* ---------- CSV ---------- */
-  $("export").addEventListener("click",function(){
-    var q=function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'};
-    var rows=[["No","状況","重要度","種類","場所","気になる点","投稿者","投稿日時","ピン位置(横%,縦%)"]];
-    items.slice().sort(function(a,b){return a.createdAt-b.createdAt}).forEach(function(it,i){
-      rows.push([i+1,it.status,it.severity,it.category,it.place,it.text,it.author,new Date(it.createdAt).toLocaleString("ja-JP"),
-        it.x==null?"":Math.round(it.x*100)+","+Math.round(it.y*100)]);
-    });
-    var csv="﻿"+rows.map(function(r){return r.map(q).join(",")}).join("\r\n");
-    var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-    a.download="shitteki-list.csv";document.body.appendChild(a);a.click();a.remove();
-  });
-
   /* ---------- 接続 ---------- */
   function boot(){
     var cfg=window.FIREBASE_CONFIG;
@@ -438,7 +333,7 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
     firebase.auth().signInAnonymously().then(function(cred){
       uid=cred.user.uid;db=firebase.firestore();$("post").disabled=false;
       db.collection("issues").onSnapshot(function(snap){
-        items=snap.docs.map(function(d){var v=d.data();v.id=d.id;return v});render();
+        $("count-line").textContent="これまでに "+snap.size+" 件の指摘が共有されています。";
       },function(){msg("一覧を読み込めませんでした。時間をおいて開き直してください。")});
     }).catch(function(){msg("接続できませんでした。時間をおいて開き直してください。")});
   }
