@@ -160,11 +160,6 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
       <button id="post" class="primary" type="button" disabled>指摘を投稿</button>
     </section>
 
-    <section class="panel" aria-labelledby="list-h">
-      <h2 id="list-h">共有された指摘</h2>
-      <p class="hint" id="count-line">読み込み中…</p>
-      <a class="btn" href="list.html">指摘内容を一覧で見る →</a>
-    </section>
   </div>
   </div>
 </div>
@@ -183,7 +178,7 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
   function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
   function toast(msg){var t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2600)}
   function fmt(ts){if(!ts)return"";var d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
-  function msg(t){$("count-line").textContent=t}
+  function msg(t){toast(t)}
 
   $("open-bot").href=window.CHATBOT_URL||"#";
   if(window.CHATBOT_URL)$("bot").src=window.CHATBOT_URL;
@@ -339,9 +334,6 @@ table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
     firebase.initializeApp(cfg);
     firebase.auth().signInAnonymously().then(function(cred){
       uid=cred.user.uid;db=firebase.firestore();$("post").disabled=false;
-      db.collection("issues").onSnapshot(function(snap){
-        $("count-line").textContent="これまでに "+snap.size+" 件の指摘が共有されています。";
-      },function(){msg("一覧を読み込めませんでした。時間をおいて開き直してください。")});
     }).catch(function(){msg("接続できませんでした。時間をおいて開き直してください。")});
   }
   boot();
