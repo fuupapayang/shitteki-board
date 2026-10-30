@@ -75,6 +75,20 @@ textarea{min-height:96px;resize:vertical}
 .status[data-s="未対応"]{color:var(--crit)}
 .status[data-s="対応中"]{color:var(--warn)}
 .status[data-s="完了"]{color:var(--ok)}
+.seg{display:inline-flex}
+.seg button{border-radius:0;padding:5px 12px}
+.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table.tbl{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.tbl th{text-align:left;font-weight:700;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr.done td{opacity:.6}
+.tbl .t-place{min-width:110px;font-weight:700}
+.tbl .t-text{min-width:200px;white-space:pre-wrap}
+.tbl .nw{white-space:nowrap}
+.tbl .imgbtn{padding:1px 8px;font-size:12px;margin-top:4px}
 .empty{border:1px dashed var(--line);border-radius:8px;padding:28px 16px;text-align:center;color:var(--muted)}
 .lb{position:fixed;inset:0;background:rgba(0,0,0,.8);display:grid;place-items:center;padding:20px;z-index:20;overflow:auto}
 .lb[hidden]{display:none}
@@ -146,6 +160,7 @@ textarea{min-height:96px;resize:vertical}
         <select id="f-status" aria-label="状況で絞り込み"><option value="">すべての状況</option><option>未対応</option><option>対応中</option><option>完了</option></select>
         <select id="f-cat" aria-label="種類で絞り込み"><option value="">すべての種類</option><option>文言</option><option>デザイン</option><option>挙動</option><option>回答内容</option><option>その他</option></select>
         <select id="f-sev" aria-label="重要度で絞り込み"><option value="">すべての重要度</option><option>高</option><option>中</option><option>低</option></select>
+        <span class="seg" role="group" aria-label="表示の切り替え"><button id="v-card" type="button">カード</button><button id="v-table" type="button">一覧表</button></span>
         <span class="count" id="count"></span>
       </div>
       <div class="list" id="list"><div class="empty">読み込み中…</div></div>
@@ -318,6 +333,38 @@ textarea{min-height:96px;resize:vertical}
   });
 
   /* ---------- 一覧 ---------- */
+  var view=lsGet("shitteki-view")==="table"?"table":"card";
+  function syncSeg(){$("v-card").setAttribute("aria-pressed",view==="card");$("v-table").setAttribute("aria-pressed",view==="table")}
+  $("v-card").addEventListener("click",function(){view="card";lsSet("shitteki-view",view);syncSeg();render()});
+  $("v-table").addEventListener("click",function(){view="table";lsSet("shitteki-view",view);syncSeg();render()});
+  syncSeg();
+  function renderTable(shown){
+    var rows=shown.slice().reverse();
+    var wrap=document.createElement("div");wrap.className="tbl-wrap";
+    var t=document.createElement("table");t.className="tbl";
+    var th=document.createElement("thead"),hr=document.createElement("tr");
+    ["No","指摘箇所","指摘内容","種類","重要度","状況","投稿者"].forEach(function(h){var c=document.createElement("th");c.textContent=h;hr.appendChild(c)});
+    th.appendChild(hr);t.appendChild(th);
+    var tb=document.createElement("tbody");
+    rows.forEach(function(it){
+      var tr=document.createElement("tr");if(it.status==="完了")tr.className="done";
+      function td(cls,txt){var c=document.createElement("td");if(cls)c.className=cls;c.textContent=txt;tr.appendChild(c);return c}
+      var n=td("nw","#"+it._no);
+      if(it.img){var b=document.createElement("button");b.type="button";b.className="imgbtn";b.textContent="画像";b.addEventListener("click",function(){openLb(it)});n.appendChild(document.createElement("br"));n.appendChild(b)}
+      td("t-place",it.place||"（未入力）");
+      td("t-text",it.text);
+      td("nw",it.category||"");
+      var sv=td("nw sev-"+it.severity,it.severity);
+      var st=document.createElement("td");st.className="nw";
+      var sel=document.createElement("select");sel.className="status";sel.setAttribute("data-s",it.status);sel.setAttribute("aria-label","状況");
+      STATUSES.forEach(function(s){var o=document.createElement("option");o.textContent=s;if(s===it.status)o.selected=true;sel.appendChild(o)});
+      sel.addEventListener("change",function(){db.collection("issues").doc(it.id).update({status:sel.value}).catch(function(){toast("状況を変更できませんでした")})});
+      st.appendChild(sel);tr.appendChild(st);
+      td("nw",it.author||"匿名");
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);wrap.appendChild(t);$("list").appendChild(wrap);
+  }
   function pinFor(it){return it.x==null?"":'<span class="pin" style="left:'+(it.x*100)+'%;top:'+(it.y*100)+'%">'+it._no+'</span>'}
   function render(){
     var fs=$("f-status").value,fc=$("f-cat").value,fv=$("f-sev").value;
@@ -328,6 +375,7 @@ textarea{min-height:96px;resize:vertical}
     var list=$("list");list.textContent="";
     if(!all.length){msg("まだ指摘はありません。左のフォームから最初の1件を追加してください。");return}
     if(!shown.length){msg("条件に合う指摘はありません。");return}
+    if(view==="table"){renderTable(shown);return}
     shown.forEach(function(it){
       var c=document.createElement("article");c.className="card"+(it.status==="完了"?" done":"");
       var top=document.createElement("div");top.className="card-top";
