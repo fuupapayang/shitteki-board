@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /issues/{id} {
+      // 匿名サインインした人なら誰でも読める
+      allow read: if request.auth != null;
+
+      // 投稿: 項目と文字数・画像サイズを制限
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+          ['text','place','category','severity','status','img','x','y','author','uid','createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 3000
+        && request.resource.data.status == '未対応'
+        && (!('img' in request.resource.data) || request.resource.data.img == null
+            || (request.resource.data.img is string && request.resource.data.img.size() <= 800000));
+
+      // 更新: 状況の変更だけ許可
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['未対応','対応中','完了'];
+
+      // 削除: 投稿した本人(同じブラウザ)のみ
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
